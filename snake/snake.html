@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Page Title</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html, body {
+      height: 100%;
+    }
+    body {
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene" width="500" height="500"></canvas>
+  <script>
+    // 获取蛇蛇行进的下一个点
+    function getNextPoint(direction, header, maxWidth, maxHeight) {
+      // 碰撞检测
+      var nextPoint = undefined;
+      if (direction == 'left') {
+        var x = header.x + 10 >= maxWidth ? 0 : header.x + 10;
+        nextPoint = { x: x, y: header.y };
+      } else if (direction === 'right') {
+        var x = header.x - 10 < 0 ? maxWidth - 10 : header.x - 10;;
+        nextPoint = { x: x, y: header.y };
+      } else if (direction === 'up') {
+        var y = header.y - 10 < 0 ? maxHeight - 10 : header.y - 10;
+        nextPoint = { x: header.x, y: y };
+      } else if (direction === 'down') {
+        var y = header.y + 10 >= maxHeight ? 0 : header.y + 10;
+        nextPoint = { x: header.x, y: y };
+      }
+
+      return nextPoint;
+    }
+    // 是否相同点
+    function isSamePoint(aPoint, bPoint) {
+      return aPoint.x === bPoint.x && aPoint.y === bPoint.y;
+    }
+    // 是否咬到自己
+    function isInclude(point, pointArr) {
+      if (!Array.isArray(pointArr)) {
+        return false;
+      }
+      var length = pointArr.length;
+      for(var i = 0; i < length; i++) {
+         if (isSamePoint(pointArr[i], point)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function Scene(elem) {
+      var cxt = this.cxt = elem.getContext("2d");
+      this.height = elem.height;
+      this.width = elem.width;
+      this.initFood([{
+        x: 50, y: 50,
+      }, {
+        x: 40, y: 50,
+      }]);
+      this.draw();
+    }
+
+    Scene.prototype.draw = function (arr) {
+      var food = this.food;
+      this.cxt.fillStyle = "#000";
+      this.cxt.fillRect(0, 0, this.width, this.height);
+      this.cxt.fillStyle = "red";
+      this.cxt.fillRect(food.x, food.y, 10, 10);
+      if (!Array.isArray(arr)) {
+        return undefined;
+      }
+      
+      this.cxt.font = "18px Verdana";
+      this.cxt.fillStyle = "#fff";
+      this.cxt.fillText(arr.length, 10, 20);
+      for (var i = 0; i < arr.length; i++) {
+        this.cxt.fillRect(arr[i].x, arr[i].y, 10, 10);
+      }
+    }
+    
+    Scene.prototype.initFood = function(pointArr) {
+      var x = undefined;
+      var y = undefined;
+      var food = undefined;
+      do {
+        x = Math.round(Math.random() * this.width) % 10 * 10;
+        y = Math.round(Math.random() * this.height) % 10 * 10;
+        food = { x: x, y: y };
+      } while (isInclude(food, pointArr));  // 待优化，防止食物形成在蛇蛇的身体上
+      this.food = food;
+    }
+
+    function Snake() {
+      this.direction = undefined; // 运动方向
+      this.length = 0; // 长度
+      this.speed = 200;
+      this.pointArr = []; //身子坐标数组
+    }
+
+    Snake.prototype.init = function() {
+      var that = this;
+      this.length = 2;
+      this.pointArr = [{
+        x: 50, y: 50,
+      }, {
+        x: 40,  y: 50,
+      }];
+      this.direction = 'left';
+      document.onkeydown = keydownEvent;
+      function keydownEvent(e) {
+        if (e && e.keyCode == 37) { // 左
+          that.direction = that.direction != 'left' ? 'right' : 'left';
+        } else if (e && e.keyCode == 38) { // 上
+          that.direction = that.direction != 'down' ? 'up' : 'down';
+        } else if (e && e.keyCode == 39) { // 右
+          that.direction = that.direction != 'right' ? 'left' : 'right';
+        } else if (e && e.keyCode == 40) { // 下
+          that.direction = that.direction != 'up' ? 'down' : 'up';
+        }
+        e.stopPropagation();
+      }
+    }
+
+    Snake.prototype.move = function(scene) {
+      var header = this.pointArr[0];
+      var direction = this.direction;
+      var nextPoint = getNextPoint(direction, header, scene.width, scene.height);
+      
+      // 如果碰撞的是食物
+      if (isSamePoint(nextPoint, scene.food)) {
+        this.pointArr.unshift(scene.food);
+        this.length++; // 长度加一
+        scene.initFood(this.pointArr);
+        scene.draw(this.pointArr);
+        return;
+      }
+      
+      // 如果咬到自己
+      if (isInclude(nextPoint, this.pointArr)) {
+        this.stop();
+        this.flash(scene);
+        return undefined;
+      }
+
+
+      var length = this.pointArr.length;
+      for(var i = length - 1; i > 0; i--) {
+        this.pointArr[i].x = this.pointArr[i - 1].x;
+        this.pointArr[i].y = this.pointArr[i - 1].y;
+      }
+      header = Object.assign(header, nextPoint);
+      scene.draw(this.pointArr);
+    }
+    
+    Snake.prototype.play = function(scene) {
+      var that = this;
+      this.init();
+      that.interval = setInterval(function () {
+        that.move(scene);
+      }, this.speed);
+    }
+
+    Snake.prototype.stop = function() {
+      clearInterval(this.interval);
+    }
+
+    Snake.prototype.flash = function(scene) {
+
+    }
+    var elem = document.getElementById("scene");
+    var scene = new Scene(elem);
+    var snake = new Snake();
+    snake.play(scene);
+
+  </script>
+</body>
+</html>
